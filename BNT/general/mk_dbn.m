@@ -29,40 +29,13 @@ function bnet = mk_dbn(intra, inter, node_sizes, varargin)
 % distributions) using bnet.CPD{i} = gaussian_CPD(...) or tabular_CPD(...) etc.
 
 
+% Default values of optional arguments (and their prerequisites)
 n = length(intra);
-ss = n;
-bnet.nnodes_per_slice = ss;
-bnet.intra = intra;
-bnet.inter = inter;
-bnet.intra1 = intra;
-dag = zeros(2*n);
-dag(1:n,1:n) = bnet.intra1;
-dag(1:n,(1:n)+n) = bnet.inter;
-dag((1:n)+n,(1:n)+n) = bnet.intra;
-bnet.dag = dag;
-bnet.names = {};
-
-directed = 1;
-if ~acyclic(dag,directed)
-  error('graph must be acyclic')
-end
-
-
-bnet.eclass1 = 1:n;
-%bnet.eclass2 = (1:n)+n;
-bnet.eclass2 = bnet.eclass1;
-for i=1:ss
-  if isequal(parents(dag, i+ss), parents(dag, i)+ss)
-    %fprintf('%d has isomorphic parents, eclass %d\n', i, bnet.eclass2(i))
-  else
-    bnet.eclass2(i) = max(bnet.eclass2) + 1;
-    %fprintf('%d has non isomorphic parents, eclass %d\n', i, bnet.eclass2(i))
-  end
-end
-
 dnodes = 1:n;
 bnet.observed = [];
+bnet.intra1 = intra;
 
+% Process optional arguments
 if nargin >= 4
   args = varargin;
   nargs = length(args);
@@ -88,6 +61,44 @@ if nargin >= 4
   end
 end
 
+% Set up the graph
+ss = n;
+bnet.nnodes_per_slice = ss;
+bnet.intra = intra;
+bnet.inter = inter;
+% bnet.intra1 set above
+dag = zeros(2*n);
+dag(1:n,1:n) = bnet.intra1;
+dag(1:n,(1:n)+n) = bnet.inter;
+dag((1:n)+n,(1:n)+n) = bnet.intra;
+bnet.dag = dag;
+bnet.names = {};
+
+directed = 1;
+if ~acyclic(dag,directed)
+  error('graph must be acyclic')
+end
+
+% Set up the equivalence classes (but only if not set in the optional
+% arguments)
+if ~isfield(bnet, 'eclass1')
+  bnet.eclass1 = 1:n;
+end
+if ~isfield(bnet, 'eclass2')
+  % Compute a (possibly) more consolidated equivalence class than
+  %     bnet.eclass2 = (1:n)+n
+  % by starting with `eclass1` and only updating those nodes with
+  % non-isomorphic parents.
+  bnet.eclass2 = bnet.eclass1;
+  for i=1:ss
+    if isequal(parents(dag, i+ss), parents(dag, i)+ss)
+      %fprintf('%d has isomorphic parents, eclass %d\n', i, bnet.eclass2(i))
+    else
+      bnet.eclass2(i) = max(bnet.eclass2) + 1;
+      %fprintf('%d has non isomorphic parents, eclass %d\n', i, bnet.eclass2(i))
+    end
+  end
+end
 
 bnet.observed = sort(bnet.observed); % for comparing sets
 ns = node_sizes;
